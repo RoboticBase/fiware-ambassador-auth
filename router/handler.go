@@ -36,6 +36,13 @@ func NewHandler() *Handler {
 
 	tokenRe := regexp.MustCompile(bearerRe)
 
+	for path, user := range holder.GetBasicAuthConf() {
+		basicAuthGroup := engine.Group(path, gin.BasicAuth(user))
+		basicAuthGroup.Any("/", func(context *gin.Context) {
+			statusOK(context)
+		})
+	}
+
 	engine.NoRoute(func(context *gin.Context) {
 		authHeader := context.Request.Header.Get(authHeader)
 		if len(authHeader) == 0 {
