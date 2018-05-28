@@ -8,6 +8,7 @@ package token
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"regexp"
@@ -33,15 +34,89 @@ type authTokens struct {
 	BasicAuths   []basicAuths   `json:"basic_auths"`
 }
 
+/*
+UnmarshalJSON : Unmarshal AUTH_TOKENS and check required
+*/
+func (t *authTokens) UnmarshalJSON(b []byte) error {
+	type authTokensP struct {
+		BearerTokens *[]bearerTokens `json:"bearer_tokens"`
+		BasicAuths   *[]basicAuths   `json:"basic_auths"`
+	}
+	var p authTokensP
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	if p.BearerTokens == nil {
+		return errors.New("bearer_tokens is required")
+	}
+	t.BearerTokens = *p.BearerTokens
+	if p.BasicAuths == nil {
+		return errors.New("basic_auths is required")
+	}
+	t.BasicAuths = *p.BasicAuths
+	return nil
+}
+
 type bearerTokens struct {
 	Token           string   `json:"token"`
 	RawAllowedPaths []string `json:"allowed_paths"`
+}
+
+/*
+UnmarshalJSON : Unmarshal AUTH_TOKENS and check required
+*/
+func (t *bearerTokens) UnmarshalJSON(b []byte) error {
+	type bearerTokensP struct {
+		Token           *string   `json:"token"`
+		RawAllowedPaths *[]string `json:"allowed_paths"`
+	}
+	var p bearerTokensP
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	if p.Token == nil {
+		return errors.New("token is required")
+	}
+	t.Token = *p.Token
+	if p.RawAllowedPaths == nil {
+		return errors.New("allowed_paths is required")
+	}
+	t.RawAllowedPaths = *p.RawAllowedPaths
+	return nil
 }
 
 type basicAuths struct {
 	Username        string   `json:"username"`
 	Password        string   `json:"password"`
 	RawAllowedPaths []string `json:"allowed_paths"`
+}
+
+/*
+UnmarshalJSON : Unmarshal AUTH_TOKENS and check required
+*/
+func (a *basicAuths) UnmarshalJSON(b []byte) error {
+	type basicAuthsP struct {
+		Username        *string   `json:"username"`
+		Password        *string   `json:"password"`
+		RawAllowedPaths *[]string `json:"allowed_paths"`
+	}
+	var p basicAuthsP
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	if p.Username == nil {
+		return errors.New("username is required")
+	}
+	a.Username = *p.Username
+	if p.Password == nil {
+		return errors.New("password is required")
+	}
+	a.Password = *p.Password
+	if p.RawAllowedPaths == nil {
+		return errors.New("allowed_paths is required")
+	}
+	a.RawAllowedPaths = *p.RawAllowedPaths
+	return nil
 }
 
 /*
@@ -69,8 +144,10 @@ func NewHolder() *Holder {
 					sl = append(sl, tokenRe)
 				}
 			}
-			bearerTokenAllowdPathes[bearerToken.Token] = sl
-			bearerTokens = append(bearerTokens, bearerToken.Token)
+			if len(sl) > 0 {
+				bearerTokenAllowdPathes[bearerToken.Token] = sl
+				bearerTokens = append(bearerTokens, bearerToken.Token)
+			}
 		}
 		for _, basicAuth := range authTokenList.BasicAuths {
 			for _, rawAllowedPath := range basicAuth.RawAllowedPaths {
