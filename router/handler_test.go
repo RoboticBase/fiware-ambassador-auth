@@ -7,6 +7,7 @@ Package router : authorize and authenticate HTTP Request using HTTP Header.
 package router
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,10 +17,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tech-sketch/fiware-bearer-auth/token"
+	"github.com/tech-sketch/fiware-ambassador-auth/token"
 )
 
-var METHODS = [...]string{"GET", "POST", "PUT", "PATHC", "DELETE", "HEAD"}
+var METHODS = [...]string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"}
+
+func getBasicAuthHeader(username string, password string) string {
+	auth := username + ":" + password
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+}
 
 func setUp(t *testing.T) (func(string, string, string) (*http.Response, error), func()) {
 	t.Helper()
@@ -51,13 +57,35 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 	doRequest, tearDown := setUp(t)
 	defer tearDown()
 
-	json := `
-	{
-		"TOKEN1": ["^/foo/\\d+/*", "^/bar/*"],
-		"TOKEN2": ["^/bar/*"],
-		"TOKEN3": []
-	}
-	`
+	json := `{
+		"bearer_tokens": [
+			{
+				"token": "TOKEN1",
+				"allowed_paths": ["^/foo/\\d+/*", "^/bar/*"]
+			}, {
+				"token": "TOKEN2",
+				"allowed_paths": ["^/bar/*"]
+			}, {
+				"token": "TOKEN3",
+				"allowed_paths": []
+			}
+		],
+		"basic_auths": [
+			{
+				"username": "user1",
+				"password": "password1",
+				"allowed_paths": ["/piyo/piyo/", "/hoge/hoge"]
+			}, {
+				"username": "user2",
+				"password": "password2",
+				"allowed_paths": ["/piyo/piyo/"]
+			}, {
+				"username": "user3",
+				"password": "password3",
+				"allowed_paths": []
+			}
+		]
+	}`
 	os.Setenv(token.AuthTokens, json)
 
 	t.Run("without Header", func(t *testing.T) {
@@ -72,14 +100,16 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: "return 401 when when Authorization header is not set"},
 			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
 			for _, c := range cases {
 				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
 					r, err := doRequest(method, c.path, "")
-					assert.Nil(err, "Get has no error")
-					assert.Equal(r.StatusCode, c.statusCode, c.desc)
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
 		}
@@ -97,14 +127,16 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/foo/a/", statusCode: http.StatusForbidden, desc: `returns 403 because "/foo/a/" is not allowed`},
 			{path: "/bar/1/", statusCode: http.StatusOK, desc: "return 200"},
 			{path: "/bar/a/", statusCode: http.StatusOK, desc: "return 200"},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
 			for _, c := range cases {
 				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
 					r, err := doRequest(method, c.path, "bearer TOKEN1")
-					assert.Nil(err, "Get has no error")
-					assert.Equal(r.StatusCode, c.statusCode, c.desc)
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
 		}
@@ -122,14 +154,16 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/foo/a/", statusCode: http.StatusForbidden, desc: `returns 403 because "/foo/a/" is not allowed`},
 			{path: "/bar/1/", statusCode: http.StatusOK, desc: "return 200"},
 			{path: "/bar/a/", statusCode: http.StatusOK, desc: "return 200"},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
 			for _, c := range cases {
 				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
 					r, err := doRequest(method, c.path, "bearer TOKEN2")
-					assert.Nil(err, "Get has no error")
-					assert.Equal(r.StatusCode, c.statusCode, c.desc)
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
 		}
@@ -141,20 +175,22 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			statusCode int
 			desc       string
 		}{
-			{path: "/", statusCode: http.StatusForbidden, desc: `returns 403 because "/" is not allowed`},
-			{path: "/some", statusCode: http.StatusForbidden, desc: `returns 403 because "/some" is not allowed`},
-			{path: "/foo/1/", statusCode: http.StatusForbidden, desc: `returns 403 because "/foo/a/" is not allowed`},
-			{path: "/foo/a/", statusCode: http.StatusForbidden, desc: `returns 403 because "/foo/a/" is not allowed`},
-			{path: "/bar/1/", statusCode: http.StatusForbidden, desc: `returns 403 because "/bar/a/" is not allowed`},
-			{path: "/bar/a/", statusCode: http.StatusForbidden, desc: `returns 403 because "/bar/a/" is not allowed`},
+			{path: "/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/some", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: "return 401 when when Authorization header is not set"},
+			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: "return 401 when when Authorization header is not set"},
+			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
 			for _, c := range cases {
 				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
 					r, err := doRequest(method, c.path, "bearer TOKEN3")
-					assert.Nil(err, "Get has no error")
-					assert.Equal(r.StatusCode, c.statusCode, c.desc)
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
 		}
@@ -172,14 +208,16 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: "return 401 when not existing token is set"},
 			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: "return 401 when not existing token is set"},
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: "return 401 when not existing token is set"},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
 			for _, c := range cases {
 				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
 					r, err := doRequest(method, c.path, "bearer TOKEN4")
-					assert.Nil(err, "Get has no error")
-					assert.Equal(r.StatusCode, c.statusCode, c.desc)
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
 		}
@@ -197,14 +235,124 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
 			for _, c := range cases {
 				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
 					r, err := doRequest(method, c.path, "TOKEN1")
-					assert.Nil(err, "Get has no error")
-					assert.Equal(r.StatusCode, c.statusCode, c.desc)
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
+				})
+			}
+		}
+	})
+
+	t.Run(`with valid "user1"`, func(t *testing.T) {
+		cases := []struct {
+			path       string
+			statusCode int
+			desc       string
+		}{
+			{path: "/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/some", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/piyo/piyo/", statusCode: http.StatusOK, desc: "return 200"},
+			{path: "/hoge/hoge", statusCode: http.StatusOK, desc: "return 200"},
+		}
+
+		for _, method := range METHODS {
+			for _, c := range cases {
+				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
+					r, err := doRequest(method, c.path, getBasicAuthHeader("user1", "password1"))
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
+				})
+			}
+		}
+	})
+
+	t.Run(`with valid "user2"`, func(t *testing.T) {
+		cases := []struct {
+			path       string
+			statusCode int
+			desc       string
+		}{
+			{path: "/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/some", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/piyo/piyo/", statusCode: http.StatusOK, desc: "return 200"},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+		}
+
+		for _, method := range METHODS {
+			for _, c := range cases {
+				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
+					r, err := doRequest(method, c.path, getBasicAuthHeader("user2", "password2"))
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
+				})
+			}
+		}
+	})
+
+	t.Run(`with valid "user3"`, func(t *testing.T) {
+		cases := []struct {
+			path       string
+			statusCode int
+			desc       string
+		}{
+			{path: "/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/some", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+		}
+
+		for _, method := range METHODS {
+			for _, c := range cases {
+				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
+					r, err := doRequest(method, c.path, getBasicAuthHeader("user3", "password3"))
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
+				})
+			}
+		}
+	})
+
+	t.Run(`with invalid "user1" password`, func(t *testing.T) {
+		cases := []struct {
+			path       string
+			statusCode int
+			desc       string
+		}{
+			{path: "/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/some", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+		}
+
+		for _, method := range METHODS {
+			for _, c := range cases {
+				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
+					r, err := doRequest(method, c.path, getBasicAuthHeader("user1", "invalid"))
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
 		}
@@ -228,14 +376,16 @@ func TestNewHandlerNoEnv(t *testing.T) {
 			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
 			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
 			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
 			for _, c := range cases {
 				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
 					r, err := doRequest(method, c.path, "")
-					assert.Nil(err, "Get has no error")
-					assert.Equal(r.StatusCode, c.statusCode, c.desc)
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
 		}
@@ -252,16 +402,46 @@ func TestNewHandlerNoEnv(t *testing.T) {
 			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
 			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
 			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
 			for _, c := range cases {
 				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
 					r, err := doRequest(method, c.path, "bearer TOKEN1")
-					assert.Nil(err, "Get has no error")
-					assert.Equal(r.StatusCode, c.statusCode, c.desc)
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
 		}
 	})
+
+	t.Run(`with valid "user1"`, func(t *testing.T) {
+		cases := []struct {
+			path       string
+			statusCode int
+			desc       string
+		}{
+			{path: "/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/some", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+		}
+
+		for _, method := range METHODS {
+			for _, c := range cases {
+				t.Run(fmt.Sprintf("?method=%v&path=%v", method, c.path), func(t *testing.T) {
+					r, err := doRequest(method, c.path, getBasicAuthHeader("user1", "password1"))
+					assert.Nil(err, fmt.Sprintf("%s has no error", method))
+					assert.Equal(c.statusCode, r.StatusCode, c.desc)
+				})
+			}
+		}
+	})
+
 }
