@@ -10,19 +10,19 @@ ENV GOROOT=/usr/lib/go \
 
 WORKDIR $GOPATH
 
-COPY . /tmp/fiware-bearer-auth
+COPY . /tmp/fiware-ambassador-auth
 
 RUN apk update && \
     apk add --no-cache --virtual .go musl-dev git go && \
     mkdir -p $GOPATH/src/github.com/tech-sketch && \
-    mv /tmp/fiware-bearer-auth $GOPATH/src/github.com/tech-sketch && \
-    cd $GOPATH/src/github.com/tech-sketch/fiware-bearer-auth && \
+    mv /tmp/fiware-ambassador-auth $GOPATH/src/github.com/tech-sketch && \
+    cd $GOPATH/src/github.com/tech-sketch/fiware-ambassador-auth && \
     go get -u github.com/golang/dep/cmd/dep && \
     $GOPATH/bin/dep ensure && \
-    go install github.com/tech-sketch/fiware-bearer-auth && \
-    mv $GOPATH/bin/fiware-bearer-auth /usr/local/bin && \
+    go install github.com/tech-sketch/fiware-ambassador-auth && \
+    mv $GOPATH/bin/fiware-ambassador-auth /usr/local/bin && \
     rm -rf $GOPATH && \
     apk del --purge .go
 
 EXPOSE 3000
-ENTRYPOINT ["/usr/local/bin/fiware-bearer-auth"]
+ENTRYPOINT ["/usr/local/bin/fiware-ambassador-auth"]
