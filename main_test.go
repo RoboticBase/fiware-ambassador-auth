@@ -1,5 +1,5 @@
 /*
-Package main : entry point of fiware-bearer-auth.
+Package main : entry point of fiware-ambassador-auth.
 
 	license: Apache license 2.0
 	copyright: Nobuyuki Matsui <nobuyuki.matsui@gmail.com>
