@@ -118,7 +118,7 @@ func TestNewHolderWithValidENV(t *testing.T) {
 			[
 				{
 					"token": "TOKEN1",
-					"allowed_paths": ["^/foo/\\d+/*", "^/bar/*"]
+					"allowed_paths": ["^/foo/\\d+/.*$", "^/bar/.*$"]
 				}
 			]
 		`},
@@ -126,10 +126,10 @@ func TestNewHolderWithValidENV(t *testing.T) {
 			[
 				{
 					"token": "TOKEN1",
-					"allowed_paths": ["^/foo/\\d+/*", "**", "^/bar/*"]
+					"allowed_paths": ["^/foo/\\d+/.*$", "**", "^/bar/.*$"]
 				},{
 					"token": "TOKEN2",
-					"allowed_paths": ["^/bar/*", "??"]
+					"allowed_paths": ["^/bar/.*$", "??"]
 				}
 			]
 		`},
@@ -227,9 +227,9 @@ func TestNewHolderWithValidENV(t *testing.T) {
 							`GetAllowedPaths() returns emplty slice when not existing token is given`)
 						assert.Len(holder.GetAllowedPaths("TOKEN1"), 2,
 							`GetAllowedPaths("TOKEN1") returns 2 length slice`)
-						assert.Contains(holder.GetAllowedPaths("TOKEN1"), regexp.MustCompile("^/foo/\\d+/*"),
+						assert.Contains(holder.GetAllowedPaths("TOKEN1"), regexp.MustCompile("^/foo/\\d+/.*$"),
 							`GetAllowedPaths("TOKEN1") contains the slice of Regexp which is compiled from json string`)
-						assert.Contains(holder.GetAllowedPaths("TOKEN1"), regexp.MustCompile("^/bar/*"),
+						assert.Contains(holder.GetAllowedPaths("TOKEN1"), regexp.MustCompile("^/bar/.*$"),
 							`GetAllowedPaths("TOKEN1") contains the slice of Regexp which is compiled from json string`)
 						assert.Len(holder.GetAllowedPaths("TOKEN2"), 0,
 							`GetAllowedPaths("TOKEN2") returns 0 length slice`)
@@ -253,13 +253,13 @@ func TestNewHolderWithValidENV(t *testing.T) {
 							`GetAllowedPaths() returns emplty slice when not existing token is given`)
 						assert.Len(holder.GetAllowedPaths("TOKEN1"), 2,
 							`GetAllowedPaths("TOKEN1") returns 2 length slice`)
-						assert.Contains(holder.GetAllowedPaths("TOKEN1"), regexp.MustCompile("^/foo/\\d+/*"),
+						assert.Contains(holder.GetAllowedPaths("TOKEN1"), regexp.MustCompile("^/foo/\\d+/.*$"),
 							`GetAllowedPaths("TOKEN1") contains the slice of Regexp which is compiled from json string`)
-						assert.Contains(holder.GetAllowedPaths("TOKEN1"), regexp.MustCompile("^/bar/*"),
+						assert.Contains(holder.GetAllowedPaths("TOKEN1"), regexp.MustCompile("^/bar/.*$"),
 							`GetAllowedPaths("TOKEN1") contains the slice of Regexp which is compiled from json string`)
 						assert.Len(holder.GetAllowedPaths("TOKEN2"), 1,
 							`GetAllowedPaths("TOKEN2") returns 1 length slice`)
-						assert.Contains(holder.GetAllowedPaths("TOKEN2"), regexp.MustCompile("^/bar/*"),
+						assert.Contains(holder.GetAllowedPaths("TOKEN2"), regexp.MustCompile("^/bar/.*$"),
 							`GetAllowedPaths("TOKEN2") contains the slice of Regexp which is compiled from json string`)
 					})
 				}
@@ -300,7 +300,7 @@ func TestNewHolderWithInvalidENV(t *testing.T) {
 			{
 				"bearer_tokens": [
 					{
-						"allowed_paths": ["^/bar/*"]
+						"allowed_paths": ["^/bar/.*$"]
 					}
 				],
 				"basic_auths": [
@@ -367,7 +367,7 @@ func TestNewHolderWithInvalidENV(t *testing.T) {
 				"bearer_tokens": [
 					{
 						"token": "TOKEN1",
-						"allowed_paths": ["^/bar/*"]
+						"allowed_paths": ["^/bar/.*$"]
 					}
 				],
 				"basic_auths": [
@@ -383,7 +383,7 @@ func TestNewHolderWithInvalidENV(t *testing.T) {
 				"bearer_tokens": [
 					{
 						"token": "TOKEN1",
-						"allowed_paths": ["^/bar/*"]
+						"allowed_paths": ["^/bar/.*$"]
 					}
 				],
 				"basic_auths": [
@@ -399,7 +399,7 @@ func TestNewHolderWithInvalidENV(t *testing.T) {
 				"bearer_tokens": [
 					{
 						"token": "TOKEN1",
-						"allowed_paths": ["^/bar/*"]
+						"allowed_paths": ["^/bar/.*$"]
 					}
 				],
 				"basic_auths": [
@@ -415,7 +415,7 @@ func TestNewHolderWithInvalidENV(t *testing.T) {
 				"bearer_tokens": [
 					{
 						"token": "TOKEN1",
-						"allowed_paths": ["^/bar/*"]
+						"allowed_paths": ["^/bar/.*$"]
 					}
 				],
 				"basic_auths": [
@@ -432,7 +432,7 @@ func TestNewHolderWithInvalidENV(t *testing.T) {
 				"bearer_tokens": [
 					{
 						"token": "TOKEN1",
-						"allowed_paths": ["^/bar/*"]
+						"allowed_paths": ["^/bar/.*$"]
 					}
 				],
 				"basic_auths": [
@@ -472,7 +472,7 @@ func TestNewHolderWithInvalidENV(t *testing.T) {
 				"bearer_tokens": [
 					{
 						"token": "TOKEN1",
-						"allowed_paths": ["^/bar/*"]
+						"allowed_paths": ["^/bar/.*$"]
 					}
 				]
 			}
@@ -482,7 +482,7 @@ func TestNewHolderWithInvalidENV(t *testing.T) {
 				"bearer_tokens": [
 					{
 						"token": "TOKEN1",
-						"allowed_paths": ["^/bar/*"]
+						"allowed_paths": ["^/bar/.*$"]
 					}
 				],
 				"basic_auths": false
@@ -494,7 +494,7 @@ func TestNewHolderWithInvalidENV(t *testing.T) {
 				"bearer_tokens": [
 					{
 						"token": "TOKEN1",
-						"allowed_paths": ["^/bar/*"]
+						"allowed_paths": ["^/bar/.*$"]
 					}
 				]
 				"basic_auths": [
