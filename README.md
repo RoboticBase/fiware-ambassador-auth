@@ -2,12 +2,9 @@
 This REST API service works with Ambassador on Kubernetes in order to authorize and authanticate the client.
 
 ## Description
-This REST API service receives any path and any methods, and checks Authorization Header. In this version, Bearer Token Authorization and Basic Authorization are acceptable.
+This REST API service accepts any path and any methods, and checks the Authorization Header of HTTP Request. In this version, Bearer Token Authorization and Basic Authorization are acceptable.
 
-* Bearer Token Authorization ("Authorization: Bearer *TOKEN*")
-* Basic Authorization: ("Authorization: Basic *base64_encoded_useranme:password*>)
-
-This service checks Authorization Header like below:
+The authrization and authentication flow is like below:
 
 1. If Authorization Header does not exist, this service always responds with `401 Unauhtorized`.
 1. If Token does not exist in `AUTH_TOKENS` JSON which is given from the environment variable, this service responds with `401 Unauthorized`.
@@ -20,14 +17,14 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 
 ## `AUTH_TOKENS` JSON template
 
-* caution: `bearer_tokens` accept "regular expression" as the items of `allowed_paths`, but `basic_auth` **can not** accept "regular expression" as the items of `allowd_paths`.
+* **caution**: `bearer_tokens` accept "regular expression" as the items of `allowed_paths`, but `basic_auths` **can not** accept "regular expression" as the items of `allowd_paths`.
 
 ```text
 {
   "bearer_tokens": [
     {
       "token": "<<token1>>",
-      "allowed_paths": ["<<regex_of_allowed_path1>>", "<<regex_of_allowed_path2>>", ...]
+      "allowed_paths": ["<<allowed_path1_regex>>", "<<allowed_path2_regex>>", ...]
     }, {
       ...
     }
@@ -36,7 +33,7 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
     {
       "username": "<<user1>>",
       "password": "<<password_of_user1>>",
-      "allowed_paths": ["<<allowed_path_str1>>", "<<allowd_path_str2>>", ...]
+      "allowed_paths": ["<<allowed_path1_str>>", "<<allowd_path2_str>>", ...]
     }, {
       ...
     }
