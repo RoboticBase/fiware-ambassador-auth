@@ -79,7 +79,7 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
     * If you want to change exposed port, set the `LISTEN_PORT` environment variable.
 
     ```bash
-    $ docker run -d -p 3000:3000 techsketch/fiware-ambassador-auth
+    $ env LISTEN_PORT=3000 docker run -d -p 3000:3000 techsketch/fiware-ambassador-auth
     ```
 
 ## Build from source code
@@ -88,6 +88,13 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 
     ```bash
     $ go get -u github.com/tech-sketch/fiware-ambassador-auth
+    $ cd ${GOPATH}/src/github.com/tech-sketch/fiware-ambassador-auth
+    ```
+1. install dependencies
+
+    ```bash
+    $ go get -u github.com/golang/dep/cmd/dep
+    $ dep ensure
     ```
 1. go install
 
@@ -97,7 +104,7 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 1. run service
 
     ```bash
-    $ LISTEN_PORT=3000 ${GOPATH}/bin/fiware-bearer-auth
+    $ env LISTEN_PORT=3000 ${GOPATH}/bin/fiware-ambassador-auth
     ```
 
 ## License
