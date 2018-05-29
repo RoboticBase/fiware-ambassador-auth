@@ -18,7 +18,7 @@ func TestGetListenPortNoEnv(t *testing.T) {
 	assert := assert.New(t)
 
 	port := getListenPort()
-	assert.Equal(port, ":"+defaultPort)
+	assert.Equal(":"+defaultPort, port)
 }
 
 func TestGetListenPortWithEnv(t *testing.T) {
@@ -42,7 +42,7 @@ func TestGetListenPortWithEnv(t *testing.T) {
 			os.Setenv(listenPort, c.port)
 
 			port := getListenPort()
-			assert.Equal(port, c.expect, c.desc)
+			assert.Equal(c.expect, port, c.desc)
 			os.Unsetenv(listenPort)
 		})
 	}
