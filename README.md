@@ -9,6 +9,7 @@ This REST API service accepts any path and any methods, and checks the Authoriza
 
 The authrization and authentication flow is like below:
 
+1. If request path contains `/static/`, this service responds `200 OK`.
 1. If Authorization Header does not exist, this service always responds with `401 Unauhtorized`.
 1. If Token does not exist in `AUTH_TOKENS` JSON which is given from the environment variable, this service responds with `401 Unauthorized`.
 1. If a set of username and password does not exist in `AUTH_TOKENS` JSON which is given from the environment variable, this service responds with `401 Unauthorized`.

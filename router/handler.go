@@ -17,6 +17,7 @@ import (
 
 const authHeader = "authorization"
 const bearerRe = `(?i)^bearer (.+)$`
+const staticRe = `^.*/static/.*$`
 
 /*
 Handler : a struct to handle HTTP Request and check its Header.
@@ -35,6 +36,7 @@ func NewHandler() *Handler {
 	holder := token.NewHolder()
 
 	tokenRe := regexp.MustCompile(bearerRe)
+	pathRe := regexp.MustCompile(staticRe)
 
 	for path, user := range holder.GetBasicAuthConf() {
 		basicAuthGroup := engine.Group(path, gin.BasicAuth(user))
@@ -44,8 +46,11 @@ func NewHandler() *Handler {
 	}
 
 	engine.NoRoute(func(context *gin.Context) {
+		path := context.Request.URL.Path
 		authHeader := context.Request.Header.Get(authHeader)
-		if len(authHeader) == 0 {
+		if pathRe.MatchString(path) {
+			statusOK(context)
+		} else if len(authHeader) == 0 {
 			authHeaderMissing(context)
 		} else {
 			matches := tokenRe.FindAllStringSubmatch(authHeader, -1)
