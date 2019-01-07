@@ -14,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/tech-sketch/fiware-ambassador-auth/token"
+
+	lru "github.com/hashicorp/golang-lru"
 )
 
 const authHeader = "authorization"
@@ -29,7 +31,10 @@ Handler : a struct to handle HTTP Request and check its Header.
 	Handler authorizes and authenticates all HTTP Requests using its HTTP Header.
 */
 type Handler struct {
-	Engine *gin.Engine
+	Engine                   *gin.Engine
+	matchBasicAuthPathCache  *lru.Cache
+	verifyBasicAuthCache     *lru.Cache
+	matchBearerAuthPathCache *lru.Cache
 }
 
 /*
@@ -39,16 +44,31 @@ func NewHandler() *Handler {
 	engine := gin.Default()
 	holder := token.NewHolder()
 
+	basicRe := regexp.MustCompile(basicReStr)
+	basicUserRe := regexp.MustCompile(basicUserReStr)
 	tokenRe := regexp.MustCompile(bearerReStr)
 	pathRe := regexp.MustCompile(staticReStr)
+
+	matchBasicAuthPathCache, err := lru.New(1024)
+	verifyBasicAuthCache, err := lru.New(1024)
+	matchBearerAuthPathCache, err := lru.New(1024)
+	if err != nil {
+		panic(err)
+	}
+	router := &Handler{
+		Engine:                   engine,
+		matchBasicAuthPathCache:  matchBasicAuthPathCache,
+		verifyBasicAuthCache:     verifyBasicAuthCache,
+		matchBearerAuthPathCache: matchBearerAuthPathCache,
+	}
 
 	engine.NoRoute(func(context *gin.Context) {
 		path := context.Request.URL.Path
 		authHeader := context.Request.Header.Get(authHeader)
 		if pathRe.MatchString(path) {
 			statusOK(context)
-		} else if matchBasicAuthPath(path, holder.GetBasicAuthConf()) {
-			if verifyBasicAuth(path, authHeader, holder.GetBasicAuthConf()) {
+		} else if router.matchBasicAuthPath(path, holder.GetBasicAuthConf()) {
+			if router.verifyBasicAuth(path, authHeader, basicRe, basicUserRe, holder.GetBasicAuthConf()) {
 				statusOK(context)
 			} else {
 				basicAuthRequired(context)
@@ -60,7 +80,7 @@ func NewHandler() *Handler {
 				matches := tokenRe.FindAllStringSubmatch(authHeader, -1)
 				if len(matches) == 0 || !holder.HasToken(matches[0][1]) {
 					tokenMissmatch(context)
-				} else if !matchBearerAuthPath(context, holder.GetAllowedPaths(matches[0][1])) {
+				} else if !router.matchBearerAuthPath(path, matches[0][1], holder.GetAllowedPaths(matches[0][1])) {
 					pathNotAllowed(context)
 				} else {
 					statusOK(context)
@@ -69,9 +89,6 @@ func NewHandler() *Handler {
 		}
 	})
 
-	router := &Handler{
-		Engine: engine,
-	}
 	return router
 }
 
@@ -82,30 +99,37 @@ func (router *Handler) Run(port string) {
 	router.Engine.Run(port)
 }
 
-func matchBasicAuthPath(path string, basicAuthConf map[string]map[string]string) bool {
-	for pathReStr := range basicAuthConf {
-		if regexp.MustCompile(pathReStr).MatchString(path) {
-			return true
+func (router *Handler) matchBasicAuthPath(path string, basicAuthConf map[string]map[string]string) bool {
+	if !router.matchBasicAuthPathCache.Contains(path) {
+		router.matchBasicAuthPathCache.Add(path, false)
+		for pathReStr := range basicAuthConf {
+			if regexp.MustCompile(pathReStr).MatchString(path) {
+				router.matchBasicAuthPathCache.Add(path, true)
+			}
 		}
 	}
-	return false
+	v, _ := router.matchBasicAuthPathCache.Get(path)
+	r, _ := v.(bool)
+	return r
 }
 
-func verifyBasicAuth(path string, authHeader string, basicAuthConf map[string]map[string]string) bool {
-	basicRe := regexp.MustCompile(basicReStr)
-	basicUserRe := regexp.MustCompile(basicUserReStr)
-	matches := basicRe.FindAllStringSubmatch(authHeader, -1)
-	if len(authHeader) > 0 && len(matches) > 0 {
-		encodedUser, err := base64.StdEncoding.DecodeString(matches[0][1])
-		if err == nil {
-			userMatches := basicUserRe.FindAllStringSubmatch(string(encodedUser), -1)
-			if len(userMatches[0]) == 3 {
-				for pathReStr, user := range basicAuthConf {
-					if regexp.MustCompile(pathReStr).MatchString(path) {
-						password, ok := user[userMatches[0][1]]
-						if ok {
-							if password == userMatches[0][2] {
-								return true
+func (router *Handler) verifyBasicAuth(path string, authHeader string, basicRe *regexp.Regexp, basicUserRe *regexp.Regexp, basicAuthConf map[string]map[string]string) bool {
+	key := authHeader + "\t" + path
+	if !router.verifyBasicAuthCache.Contains(key) {
+		matches := basicRe.FindAllStringSubmatch(authHeader, -1)
+		router.verifyBasicAuthCache.Add(key, false)
+		if len(authHeader) > 0 && len(matches) > 0 {
+			encodedUser, err := base64.StdEncoding.DecodeString(matches[0][1])
+			if err == nil {
+				userMatches := basicUserRe.FindAllStringSubmatch(string(encodedUser), -1)
+				if len(userMatches[0]) == 3 {
+					for pathReStr, user := range basicAuthConf {
+						if regexp.MustCompile(pathReStr).MatchString(path) {
+							password, ok := user[userMatches[0][1]]
+							if ok {
+								if password == userMatches[0][2] {
+									router.verifyBasicAuthCache.Add(key, true)
+								}
 							}
 						}
 					}
@@ -113,17 +137,24 @@ func verifyBasicAuth(path string, authHeader string, basicAuthConf map[string]ma
 			}
 		}
 	}
-	return false
+	v, _ := router.verifyBasicAuthCache.Get(key)
+	r, _ := v.(bool)
+	return r
 }
 
-func matchBearerAuthPath(context *gin.Context, allowedPaths []*regexp.Regexp) bool {
-	path := context.Request.URL.Path
-	for _, allowedPath := range allowedPaths {
-		if allowedPath.MatchString(path) {
-			return true
+func (router *Handler) matchBearerAuthPath(path string, token string, allowedPaths []*regexp.Regexp) bool {
+	key := token + "\t" + path
+	if !router.matchBearerAuthPathCache.Contains(key) {
+		router.matchBearerAuthPathCache.Add(key, false)
+		for _, allowedPath := range allowedPaths {
+			if allowedPath.MatchString(path) {
+				router.matchBearerAuthPathCache.Add(key, true)
+			}
 		}
 	}
-	return false
+	v, _ := router.matchBearerAuthPathCache.Get(key)
+	r, _ := v.(bool)
+	return r
 }
 
 func authHeaderMissing(context *gin.Context) {
