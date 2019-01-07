@@ -84,7 +84,10 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 				"password": "password3",
 				"allowed_paths": []
 			}
-		]
+		],
+		"no_auths": {
+			"allowed_paths": ["^.*/static/.*$"]
+		}
 	}`
 	os.Setenv(token.AuthTokens, json)
 
@@ -123,7 +126,6 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			}
 		}
 	})
-
 	t.Run("with TOKEN1", func(t *testing.T) {
 		cases := []struct {
 			path       string
@@ -470,13 +472,13 @@ func TestNewHandlerNoEnv(t *testing.T) {
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/static/", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/static/foo", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/static/foo/bar.js", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
 			{path: "/piyo/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/piyo/static/", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/piyo/static/foo", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -505,13 +507,13 @@ func TestNewHandlerNoEnv(t *testing.T) {
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/static/", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/static/foo", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/static/foo/bar.js", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
 			{path: "/piyo/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/piyo/static/", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/piyo/static/foo", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -541,13 +543,13 @@ func TestNewHandlerNoEnv(t *testing.T) {
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/static/", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/static/foo", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/static/foo/bar.js", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
 			{path: "/piyo/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/piyo/static/", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/piyo/static/foo", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
+			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusUnauthorized, desc: "return 401 when auth_tokens is not set"},
 		}
 
 		for _, method := range METHODS {

@@ -27,11 +27,13 @@ type Holder struct {
 	bearerTokenAllowdPathes map[string][]*regexp.Regexp
 	bearerTokens            []string
 	basicAuthPathes         map[string]map[string]string
+	noAuthPathes            []string
 }
 
 type authTokens struct {
 	BearerTokens []bearerTokens `json:"bearer_tokens"`
 	BasicAuths   []basicAuths   `json:"basic_auths"`
+	NoAuths      noAuths        `json:"no_auths"`
 }
 
 /*
@@ -41,6 +43,7 @@ func (t *authTokens) UnmarshalJSON(b []byte) error {
 	type authTokensP struct {
 		BearerTokens *[]bearerTokens `json:"bearer_tokens"`
 		BasicAuths   *[]basicAuths   `json:"basic_auths"`
+		NoAuths      *noAuths        `json:"no_auths"`
 	}
 	var p authTokensP
 	if err := json.Unmarshal(b, &p); err != nil {
@@ -54,6 +57,10 @@ func (t *authTokens) UnmarshalJSON(b []byte) error {
 		return errors.New("basic_auths is required")
 	}
 	t.BasicAuths = *p.BasicAuths
+	if p.NoAuths == nil {
+		return errors.New("no_auths is required")
+	}
+	t.NoAuths = *p.NoAuths
 	return nil
 }
 
@@ -75,11 +82,11 @@ func (t *bearerTokens) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	if p.Token == nil {
-		return errors.New("token is required")
+		return errors.New("bearer_tokens.token is required")
 	}
 	t.Token = *p.Token
 	if p.RawAllowedPaths == nil {
-		return errors.New("allowed_paths is required")
+		return errors.New("bearer_tokens.allowed_paths is required")
 	}
 	t.RawAllowedPaths = *p.RawAllowedPaths
 	return nil
@@ -105,17 +112,40 @@ func (a *basicAuths) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	if p.Username == nil {
-		return errors.New("username is required")
+		return errors.New("basic_auths.username is required")
 	}
 	a.Username = *p.Username
 	if p.Password == nil {
-		return errors.New("password is required")
+		return errors.New("basic_auths.password is required")
 	}
 	a.Password = *p.Password
 	if p.RawAllowedPaths == nil {
-		return errors.New("allowed_paths is required")
+		return errors.New("basic_auths.allowed_paths is required")
 	}
 	a.RawAllowedPaths = *p.RawAllowedPaths
+	return nil
+}
+
+type noAuths struct {
+	RawAllowedPaths []string `json:"allowed_paths"`
+}
+
+/*
+UnmarshalJSON : Unmarshal AUTH_TOKENS and check required
+*/
+func (n *noAuths) UnmarshalJSON(b []byte) error {
+	type noAuthsP struct {
+		RawAllowedPaths *[]string `json:"allowed_paths"`
+	}
+	var p noAuthsP
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	if p.RawAllowedPaths == nil {
+		n.RawAllowedPaths = []string{}
+	} else {
+		n.RawAllowedPaths = *p.RawAllowedPaths
+	}
 	return nil
 }
 
@@ -134,6 +164,7 @@ func NewHolder() *Holder {
 	bearerTokenAllowdPathes := map[string][]*regexp.Regexp{}
 	bearerTokens := []string{}
 	basicAuthPathes := map[string]map[string]string{}
+	noAuthPathes := []string{}
 
 	if err := json.Unmarshal([]byte(rawTokens), &authTokenList); err == nil {
 		for _, bearerToken := range authTokenList.BearerTokens {
@@ -158,17 +189,20 @@ func NewHolder() *Holder {
 				basicAuthPathes[rawAllowedPath][basicAuth.Username] = basicAuth.Password
 			}
 		}
+		noAuthPathes = authTokenList.NoAuths.RawAllowedPaths
 	} else {
 		log.Printf("AUTH_TOKENS parse failed: %v\n", err)
 	}
 
 	log.Printf("bearerTokenAllowdPathes: %v\n--------\n", bearerTokenAllowdPathes)
 	log.Printf("basicAuthPathes, %v\n--------\n", basicAuthPathes)
+	log.Printf("noAuthPathes, %v\n--------\n", noAuthPathes)
 
 	return &Holder{
 		bearerTokenAllowdPathes: bearerTokenAllowdPathes,
 		bearerTokens:            bearerTokens,
 		basicAuthPathes:         basicAuthPathes,
+		noAuthPathes:            noAuthPathes,
 	}
 }
 
@@ -199,4 +233,11 @@ GetBasicAuthConf : get all configurations of basic authentication.
 */
 func (holder *Holder) GetBasicAuthConf() map[string]map[string]string {
 	return holder.basicAuthPathes
+}
+
+/*
+GetNoAuthPaths : get all allowed paths without authentication.
+*/
+func (holder *Holder) GetNoAuthPaths() []string {
+	return holder.noAuthPathes
 }

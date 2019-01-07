@@ -22,7 +22,6 @@ const authHeader = "authorization"
 const basicReStr = `(?i)^basic (.+)$`
 const bearerReStr = `(?i)^bearer (.+)$`
 const basicUserReStr = `^([^:]+):(.+)$`
-const staticReStr = `^.*/static/.*$`
 const basicAuthRequiredHeader = `Www-Authenticate: Basic realm="Authorization Required"`
 
 /*
@@ -35,6 +34,7 @@ type Handler struct {
 	matchBasicAuthPathCache  *lru.Cache
 	verifyBasicAuthCache     *lru.Cache
 	matchBearerAuthPathCache *lru.Cache
+	matchNoAuthPathCache     *lru.Cache
 }
 
 /*
@@ -47,11 +47,11 @@ func NewHandler() *Handler {
 	basicRe := regexp.MustCompile(basicReStr)
 	basicUserRe := regexp.MustCompile(basicUserReStr)
 	tokenRe := regexp.MustCompile(bearerReStr)
-	pathRe := regexp.MustCompile(staticReStr)
 
 	matchBasicAuthPathCache, err := lru.New(1024)
 	verifyBasicAuthCache, err := lru.New(1024)
 	matchBearerAuthPathCache, err := lru.New(1024)
+	matchNoAuthPathCache, err := lru.New(1024)
 	if err != nil {
 		panic(err)
 	}
@@ -60,12 +60,13 @@ func NewHandler() *Handler {
 		matchBasicAuthPathCache:  matchBasicAuthPathCache,
 		verifyBasicAuthCache:     verifyBasicAuthCache,
 		matchBearerAuthPathCache: matchBearerAuthPathCache,
+		matchNoAuthPathCache:     matchNoAuthPathCache,
 	}
 
 	engine.NoRoute(func(context *gin.Context) {
 		path := context.Request.URL.Path
 		authHeader := context.Request.Header.Get(authHeader)
-		if pathRe.MatchString(path) {
+		if router.matchNoAuthPath(path, holder.GetNoAuthPaths()) {
 			statusOK(context)
 		} else if router.matchBasicAuthPath(path, holder.GetBasicAuthConf()) {
 			if router.verifyBasicAuth(path, authHeader, basicRe, basicUserRe, holder.GetBasicAuthConf()) {
@@ -153,6 +154,20 @@ func (router *Handler) matchBearerAuthPath(path string, token string, allowedPat
 		}
 	}
 	v, _ := router.matchBearerAuthPathCache.Get(key)
+	r, _ := v.(bool)
+	return r
+}
+
+func (router *Handler) matchNoAuthPath(path string, noAuthPaths []string) bool {
+	if !router.matchNoAuthPathCache.Contains(path) {
+		router.matchNoAuthPathCache.Add(path, false)
+		for _, noAuthPath := range noAuthPaths {
+			if regexp.MustCompile(noAuthPath).MatchString(path) {
+				router.matchNoAuthPathCache.Add(path, true)
+			}
+		}
+	}
+	v, _ := router.matchNoAuthPathCache.Get(path)
 	r, _ := v.(bool)
 	return r
 }
