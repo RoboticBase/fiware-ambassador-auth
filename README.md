@@ -21,7 +21,7 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 
 ## `AUTH_TOKENS` JSON template
 
-* **caution**: `bearer_tokens` accept "regular expression" as the items of `allowed_paths`, but `basic_auths` **can not** accept "regular expression" as the items of `allowd_paths`.
+* `bearer_tokens` and `basic_auths` can accept "regular expression" as the items of `allowed_paths`.
 
 ```text
 {
@@ -37,7 +37,7 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
     {
       "username": "<<user1>>",
       "password": "<<password_of_user1>>",
-      "allowed_paths": ["<<allowed_path1_str>>", "<<allowd_path2_str>>", ...]
+      "allowed_paths": ["<<allowed_path1_regex>>", "<<allowd_path2_regex>>", ...]
     }, {
       ...
     }
@@ -62,11 +62,11 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 >     {
 >       "username": "admin",
 >       "password": "0YziWgALc6PCXgwt4rn8qVxX6iANBRvl",
->       "allowed_paths": ["/management/users/", "/management/pages/"]
+>       "allowed_paths": ["^/management/users/$", "^/management/pages/.*$"]
 >     }, {
 >       "username": "user1",
 >       "password": "0YziWgALc6PCXgwt4rn8qVxX6iANBRvl",
->       "allowed_paths": ["/management/pages/"]
+>       "allowed_paths": ["^/management/pages/.*$"]
 >     }
 >   ]
 > }
