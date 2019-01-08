@@ -24,10 +24,39 @@ Holder : a struct to hold token configurations.
 	Holder construct token configurations from "AUTH_TOKEN" environment variable.
 */
 type Holder struct {
-	bearerTokenAllowdPathes map[string][]*regexp.Regexp
-	bearerTokens            []string
-	basicAuthPathes         map[string]map[string]string
-	noAuthPathes            []string
+	hosts                   []string
+	bearerTokenAllowedPaths map[string]map[string][]*regexp.Regexp
+	bearerTokens            map[string][]string
+	basicAuthPaths          map[string]map[string]map[string]string
+	noAuthPaths             map[string][]string
+}
+
+type hostSettings struct {
+	Host       string     `json:"host"`
+	AuthTokens authTokens `json:"settings"`
+}
+
+/*
+UnmarshalJSON : Unmarshal AUTH_TOKENS and check required
+*/
+func (s *hostSettings) UnmarshalJSON(b []byte) error {
+	type hostSettingsP struct {
+		Host       *string     `json:"host"`
+		AuthTokens *authTokens `json:"settings"`
+	}
+	var p hostSettingsP
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	if p.Host == nil {
+		return errors.New("host is required")
+	}
+	s.Host = *p.Host
+	if p.AuthTokens == nil {
+		return errors.New("seettings is required")
+	}
+	s.AuthTokens = *p.AuthTokens
+	return nil
 }
 
 type authTokens struct {
@@ -159,85 +188,107 @@ func NewHolder() *Holder {
 	}
 	log.Printf("%s: %v\n--------\n", AuthTokens, rawTokens)
 
-	var authTokenList authTokens
+	var hostSettingsList []hostSettings
 
-	bearerTokenAllowdPathes := map[string][]*regexp.Regexp{}
-	bearerTokens := []string{}
-	basicAuthPathes := map[string]map[string]string{}
-	noAuthPathes := []string{}
+	hosts := []string{}
+	bearerTokenAllowedPaths := map[string]map[string][]*regexp.Regexp{}
+	bearerTokens := map[string][]string{}
+	basicAuthPaths := map[string]map[string]map[string]string{}
+	noAuthPaths := map[string][]string{}
 
-	if err := json.Unmarshal([]byte(rawTokens), &authTokenList); err == nil {
-		for _, bearerToken := range authTokenList.BearerTokens {
-			sl := make([]*regexp.Regexp, 0, 0)
-			for _, rawAllowedPath := range bearerToken.RawAllowedPaths {
-				tokenRe, err := regexp.Compile(rawAllowedPath)
-				if err == nil && tokenRe != nil {
-					sl = append(sl, tokenRe)
+	if err := json.Unmarshal([]byte(rawTokens), &hostSettingsList); err == nil {
+		for _, hostSettings := range hostSettingsList {
+			hosts = append(hosts, hostSettings.Host)
+			for _, bearerToken := range hostSettings.AuthTokens.BearerTokens {
+				sl := make([]*regexp.Regexp, 0, 0)
+				for _, rawAllowedPath := range bearerToken.RawAllowedPaths {
+					tokenRe, err := regexp.Compile(rawAllowedPath)
+					if err == nil && tokenRe != nil {
+						sl = append(sl, tokenRe)
+					}
+				}
+				if len(sl) > 0 {
+					if _, ok := bearerTokenAllowedPaths[hostSettings.Host]; !ok {
+						bearerTokenAllowedPaths[hostSettings.Host] = map[string][]*regexp.Regexp{}
+					}
+					bearerTokenAllowedPaths[hostSettings.Host][bearerToken.Token] = sl
+					if _, ok := bearerTokens[hostSettings.Host]; !ok {
+						bearerTokens[hostSettings.Host] = []string{}
+					}
+					bearerTokens[hostSettings.Host] = append(bearerTokens[hostSettings.Host], bearerToken.Token)
 				}
 			}
-			if len(sl) > 0 {
-				bearerTokenAllowdPathes[bearerToken.Token] = sl
-				bearerTokens = append(bearerTokens, bearerToken.Token)
-			}
-		}
-		for _, basicAuth := range authTokenList.BasicAuths {
-			for _, rawAllowedPath := range basicAuth.RawAllowedPaths {
-				_, exist := basicAuthPathes[rawAllowedPath]
-				if !exist {
-					basicAuthPathes[rawAllowedPath] = map[string]string{}
+
+			for _, basicAuth := range hostSettings.AuthTokens.BasicAuths {
+				for _, rawAllowedPath := range basicAuth.RawAllowedPaths {
+					if _, ok := basicAuthPaths[hostSettings.Host]; !ok {
+						basicAuthPaths[hostSettings.Host] = map[string]map[string]string{}
+					}
+					if _, ok := basicAuthPaths[hostSettings.Host][rawAllowedPath]; !ok {
+						basicAuthPaths[hostSettings.Host][rawAllowedPath] = map[string]string{}
+					}
+					basicAuthPaths[hostSettings.Host][rawAllowedPath][basicAuth.Username] = basicAuth.Password
 				}
-				basicAuthPathes[rawAllowedPath][basicAuth.Username] = basicAuth.Password
 			}
+			noAuthPaths[hostSettings.Host] = hostSettings.AuthTokens.NoAuths.RawAllowedPaths
 		}
-		noAuthPathes = authTokenList.NoAuths.RawAllowedPaths
 	} else {
 		log.Printf("AUTH_TOKENS parse failed: %v\n", err)
 	}
 
-	log.Printf("bearerTokenAllowdPathes: %v\n--------\n", bearerTokenAllowdPathes)
-	log.Printf("basicAuthPathes, %v\n--------\n", basicAuthPathes)
-	log.Printf("noAuthPathes, %v\n--------\n", noAuthPathes)
+	log.Printf("hosts: %v\n--------\n", hosts)
+	log.Printf("bearerTokenAllowedPaths: %v\n--------\n", bearerTokenAllowedPaths)
+	log.Printf("basicAuthPaths, %v\n--------\n", basicAuthPaths)
+	log.Printf("noAuthPaths, %v\n--------\n", noAuthPaths)
 
 	return &Holder{
-		bearerTokenAllowdPathes: bearerTokenAllowdPathes,
+		hosts:                   hosts,
+		bearerTokenAllowedPaths: bearerTokenAllowedPaths,
 		bearerTokens:            bearerTokens,
-		basicAuthPathes:         basicAuthPathes,
-		noAuthPathes:            noAuthPathes,
+		basicAuthPaths:          basicAuthPaths,
+		noAuthPaths:             noAuthPaths,
 	}
 }
 
 /*
-GetTokens : get all bearer tokens held in this Holder.
+GetHosts : get all hosts held in this Hoder.
 */
-func (holder *Holder) GetTokens() []string {
-	return holder.bearerTokens
+func (holder *Holder) GetHosts() []string {
+	return holder.hosts
 }
 
 /*
-HasToken : check whether the bearer token is held in this Holder.
+GetTokens : get all bearer tokens associated with the host.
 */
-func (holder *Holder) HasToken(token string) bool {
-	_, ok := holder.bearerTokenAllowdPathes[token]
+func (holder *Holder) GetTokens(host string) []string {
+	return holder.bearerTokens[host]
+}
+
+/*
+HasToken : check whether the bearer token associated with the host is held in this Holder.
+*/
+func (holder *Holder) HasToken(host string, token string) bool {
+	_, ok := holder.bearerTokenAllowedPaths[host][token]
 	return ok
 }
 
 /*
 GetAllowedPaths : get all allowed paths associated with the bearer token.
 */
-func (holder *Holder) GetAllowedPaths(token string) []*regexp.Regexp {
-	return holder.bearerTokenAllowdPathes[token]
+func (holder *Holder) GetAllowedPaths(host string, token string) []*regexp.Regexp {
+	return holder.bearerTokenAllowedPaths[host][token]
 }
 
 /*
-GetBasicAuthConf : get all configurations of basic authentication.
+GetBasicAuthConf : get all configurations of basic authentication associated with the host.
 */
-func (holder *Holder) GetBasicAuthConf() map[string]map[string]string {
-	return holder.basicAuthPathes
+func (holder *Holder) GetBasicAuthConf(host string) map[string]map[string]string {
+	return holder.basicAuthPaths[host]
 }
 
 /*
-GetNoAuthPaths : get all allowed paths without authentication.
+GetNoAuthPaths : get all allowed paths without authentication associated with the host.
 */
-func (holder *Holder) GetNoAuthPaths() []string {
-	return holder.noAuthPathes
+func (holder *Holder) GetNoAuthPaths(host string) []string {
+	return holder.noAuthPaths[host]
 }
