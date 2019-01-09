@@ -184,7 +184,7 @@ NewHolder : a factory method to create Holder.
 func NewHolder() *Holder {
 	rawTokens := os.Getenv(AuthTokens)
 	if len(rawTokens) == 0 {
-		rawTokens = "{}"
+		rawTokens = "[]"
 	}
 	log.Printf("%s: %v\n--------\n", AuthTokens, rawTokens)
 
