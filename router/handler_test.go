@@ -57,35 +57,64 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 	doRequest, tearDown := setUp(t)
 	defer tearDown()
 
-	json := `{
-		"bearer_tokens": [
-			{
-				"token": "TOKEN1",
-				"allowed_paths": ["^/foo/\\d+/*", "^/bar/*"]
-			}, {
-				"token": "TOKEN2",
-				"allowed_paths": ["^/bar/*"]
-			}, {
-				"token": "TOKEN3",
-				"allowed_paths": []
+	json := `[
+		{
+			"host": "127\\.0\\.0\\.1:.*",
+			"settings": {
+				"bearer_tokens": [
+					{
+						"token": "TOKEN1",
+						"allowed_paths": ["^/foo/\\d+/*", "^/bar/*"]
+					}, {
+						"token": "TOKEN2",
+						"allowed_paths": ["^/bar/*"]
+					}, {
+						"token": "TOKEN3",
+						"allowed_paths": []
+					}
+				],
+				"basic_auths": [
+					{
+						"username": "user1",
+						"password": "password1",
+						"allowed_paths": ["^/piyo/.+/.*", "/hoge/hoge", "^/huga/[hf].+$"]
+					}, {
+						"username": "user2",
+						"password": "password2",
+						"allowed_paths": ["/piyo/piyo/"]
+					}, {
+						"username": "user3",
+						"password": "password3",
+						"allowed_paths": []
+					}
+				],
+				"no_auths": {
+					"allowed_paths": ["^.*/static/.*$"]
+				}
 			}
-		],
-		"basic_auths": [
-			{
-				"username": "user1",
-				"password": "password1",
-				"allowed_paths": ["/piyo/piyo/", "/hoge/hoge"]
-			}, {
-				"username": "user2",
-				"password": "password2",
-				"allowed_paths": ["/piyo/piyo/"]
-			}, {
-				"username": "user3",
-				"password": "password3",
-				"allowed_paths": []
+		},
+		{
+			"host": "other\\.domain\\..*",
+			"settings": {
+				"bearer_tokens": [
+					{
+						"token": "TOKEN1",
+						"allowed_paths": ["^/some"]
+					}
+				],
+				"basic_auths": [
+					{
+						"username": "user1",
+						"password": "password1",
+						"allowed_paths": ["/zap"]
+					}
+				],
+				"no_auths": {
+					"allowed_paths": ["/sss/"]
+				}
 			}
-		]
-	}`
+		}
+	]`
 	os.Setenv(token.AuthTokens, json)
 
 	t.Run("without Header", func(t *testing.T) {
@@ -102,6 +131,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/zap", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -110,6 +141,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -137,6 +169,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusOK, desc: "return 200"},
 			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/zap", statusCode: http.StatusForbidden, desc: `returns 403 because "/zap" is not allowed`},
 			{path: "/static", statusCode: http.StatusForbidden, desc: `returns 403 because "/static" is not allowed`},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -145,6 +179,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusForbidden, desc: `returns 403 because "/sss/" is not allowed`},
 		}
 
 		for _, method := range METHODS {
@@ -172,6 +207,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusOK, desc: "return 200"},
 			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/zap", statusCode: http.StatusForbidden, desc: `returns 403 because "/zap" is not allowed`},
 			{path: "/static", statusCode: http.StatusForbidden, desc: `returns 403 because "/static" is not allowed`},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -180,6 +217,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusForbidden, desc: `returns 403 because "/sss/" is not allowed`},
 		}
 
 		for _, method := range METHODS {
@@ -207,6 +245,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/zap", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -215,6 +255,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -242,6 +283,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: "return 401 when not existing token is set"},
 			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/zap", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -250,6 +293,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -277,6 +321,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
+			{path: "/zap", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -285,6 +331,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -312,6 +359,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/piyo/piyo/", statusCode: http.StatusOK, desc: "return 200"},
 			{path: "/hoge/hoge", statusCode: http.StatusOK, desc: "return 200"},
+			{path: "/huga/huga", statusCode: http.StatusOK, desc: "return 200"},
+			{path: "/zap", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -320,6 +369,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -347,6 +397,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/piyo/piyo/", statusCode: http.StatusOK, desc: "return 200"},
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/zap", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -355,6 +407,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -382,6 +435,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/zap", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -390,6 +445,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -417,6 +473,8 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
 			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/huga/huga", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
+			{path: "/zap", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
@@ -425,6 +483,7 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
 			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/sss/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -451,21 +510,24 @@ func TestNewHandlerNoEnv(t *testing.T) {
 			statusCode int
 			desc       string
 		}{
-			{path: "/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/some", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/some", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/foo/1/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/foo/a/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/bar/1/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/piyo/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/huga/huga", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/zap", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static/foo", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static/foo/bar.js", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static/foo", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/sss/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -485,21 +547,24 @@ func TestNewHandlerNoEnv(t *testing.T) {
 			statusCode int
 			desc       string
 		}{
-			{path: "/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/some", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: "Get returns 401 when AUTH_TOKENS is not set"},
-			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/some", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/foo/1/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/foo/a/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/bar/1/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/piyo/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/huga/huga", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/zap", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static/foo", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static/foo/bar.js", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static/foo", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/sss/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -519,22 +584,24 @@ func TestNewHandlerNoEnv(t *testing.T) {
 			statusCode int
 			desc       string
 		}{
-			{path: "/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
-			{path: "/some", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
-			{path: "/foo/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
-			{path: "/foo/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
-			{path: "/bar/1/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
-			{path: "/bar/a/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
-			{path: "/piyo/piyo/", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
-			{path: "/hoge/hoge", statusCode: http.StatusUnauthorized, desc: `return 401 when "bearer" keyword is missing`},
-			{path: "/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static", statusCode: http.StatusUnauthorized, desc: "return 401 when Authorization header is not set"},
-			{path: "/piyo/static/", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
-			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusOK, desc: "return 200 when path contains '/static/'"},
+			{path: "/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/some", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/foo/1/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/foo/a/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/bar/1/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/piyo/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/hoge/hoge", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/huga/huga", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/zap", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static/foo", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/static/foo/bar.js", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static/foo", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/piyo/static/foo/bar.js", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
+			{path: "/sss/", statusCode: http.StatusForbidden, desc: "Get returns 403 when AUTH_TOKENS is not set"},
 		}
 
 		for _, method := range METHODS {
@@ -547,5 +614,4 @@ func TestNewHandlerNoEnv(t *testing.T) {
 			}
 		}
 	})
-
 }

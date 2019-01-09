@@ -7,17 +7,25 @@ Package router : authorize and authenticate HTTP Request using HTTP Header.
 package router
 
 import (
+	"encoding/base64"
+	"fmt"
 	"net/http"
+	"os"
 	"regexp"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/tech-sketch/fiware-ambassador-auth/token"
+
+	lru "github.com/hashicorp/golang-lru"
 )
 
 const authHeader = "authorization"
-const bearerRe = `(?i)^bearer (.+)$`
-const staticRe = `^.*/static/.*$`
+const basicReStr = `(?i)^basic (.+)$`
+const bearerReStr = `(?i)^bearer (.+)$`
+const basicUserReStr = `^([^:]+):(.+)$`
+const basicAuthRequiredHeader = `Www-Authenticate: Basic realm="Authorization Required"`
 
 /*
 Handler : a struct to handle HTTP Request and check its Header.
@@ -25,48 +33,114 @@ Handler : a struct to handle HTTP Request and check its Header.
 	Handler authorizes and authenticates all HTTP Requests using its HTTP Header.
 */
 type Handler struct {
-	Engine *gin.Engine
+	Engine                   *gin.Engine
+	matchHostCache           *lru.Cache
+	matchBasicAuthPathCache  *lru.Cache
+	verifyBasicAuthCache     *lru.Cache
+	matchBearerAuthPathCache *lru.Cache
+	matchNoAuthPathCache     *lru.Cache
+}
+
+func customLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Start timer
+		start := time.Now()
+		path := c.Request.URL.Path
+		raw := c.Request.URL.RawQuery
+
+		// Process request
+		c.Next()
+
+		// Stop timer
+		end := time.Now()
+		latency := end.Sub(start)
+
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		domain := c.Request.Host
+		statusCode := c.Writer.Status()
+		comment := c.Errors.ByType(gin.ErrorTypePrivate).String()
+
+		if raw != "" {
+			path = path + "?" + raw
+		}
+
+		fmt.Fprintf(os.Stdout, "[GIN] %v |%3d| %13v | %15s |%-7s %s, %s\n%s",
+			end.Format("2006/01/02 - 15:04:05"),
+			statusCode,
+			latency,
+			clientIP,
+			method,
+			domain,
+			path,
+			comment,
+		)
+	}
 }
 
 /*
 NewHandler : a factory method to create Handler.
 */
 func NewHandler() *Handler {
-	engine := gin.Default()
+	engine := gin.New()
+	engine.Use(customLogger())
+	engine.Use(gin.Recovery())
 	holder := token.NewHolder()
 
-	tokenRe := regexp.MustCompile(bearerRe)
-	pathRe := regexp.MustCompile(staticRe)
+	basicRe := regexp.MustCompile(basicReStr)
+	basicUserRe := regexp.MustCompile(basicUserReStr)
+	tokenRe := regexp.MustCompile(bearerReStr)
 
-	for path, user := range holder.GetBasicAuthConf() {
-		basicAuthGroup := engine.Group(path, gin.BasicAuth(user))
-		basicAuthGroup.Any("/", func(context *gin.Context) {
-			statusOK(context)
-		})
+	matchHostCache, err := lru.New(1024)
+	matchBasicAuthPathCache, err := lru.New(1024)
+	verifyBasicAuthCache, err := lru.New(1024)
+	matchBearerAuthPathCache, err := lru.New(1024)
+	matchNoAuthPathCache, err := lru.New(1024)
+	if err != nil {
+		panic(err)
+	}
+	router := &Handler{
+		Engine:                   engine,
+		matchHostCache:           matchHostCache,
+		matchBasicAuthPathCache:  matchBasicAuthPathCache,
+		verifyBasicAuthCache:     verifyBasicAuthCache,
+		matchBearerAuthPathCache: matchBearerAuthPathCache,
+		matchNoAuthPathCache:     matchNoAuthPathCache,
 	}
 
 	engine.NoRoute(func(context *gin.Context) {
+		domain := context.Request.Host
 		path := context.Request.URL.Path
 		authHeader := context.Request.Header.Get(authHeader)
-		if pathRe.MatchString(path) {
-			statusOK(context)
-		} else if len(authHeader) == 0 {
-			authHeaderMissing(context)
-		} else {
-			matches := tokenRe.FindAllStringSubmatch(authHeader, -1)
-			if len(matches) == 0 || !holder.HasToken(matches[0][1]) {
-				tokenMissmatch(context)
-			} else if !matchPath(context, holder.GetAllowedPaths(matches[0][1])) {
-				pathNotAllowed(context)
-			} else {
+
+		if host, allowed := router.matchHost(domain, holder.GetHosts()); allowed {
+			if router.matchNoAuthPath(domain, path, holder.GetNoAuthPaths(host)) {
 				statusOK(context)
+			} else if router.matchBasicAuthPath(domain, path, holder.GetBasicAuthConf(host)) {
+				if router.verifyBasicAuth(domain, path, authHeader, basicRe, basicUserRe, holder.GetBasicAuthConf(host)) {
+					statusOK(context)
+				} else {
+					basicAuthRequired(context)
+				}
+			} else {
+				if len(authHeader) == 0 {
+					authHeaderMissing(context)
+				} else {
+					matches := tokenRe.FindAllStringSubmatch(authHeader, -1)
+					if len(matches) == 0 || !holder.HasToken(host, matches[0][1]) {
+						tokenMissmatch(context)
+					} else if !router.matchBearerAuthPath(domain, path, matches[0][1], holder.GetAllowedPaths(host, matches[0][1])) {
+						pathNotAllowed(context)
+					} else {
+						statusOK(context)
+					}
+				}
 			}
+		} else {
+			domainNotAllowed(context)
 		}
 	})
 
-	router := &Handler{
-		Engine: engine,
-	}
 	return router
 }
 
@@ -77,14 +151,104 @@ func (router *Handler) Run(port string) {
 	router.Engine.Run(port)
 }
 
-func matchPath(context *gin.Context, allowedPaths []*regexp.Regexp) bool {
-	path := context.Request.URL.Path
-	for _, allowedPath := range allowedPaths {
-		if allowedPath.MatchString(path) {
-			return true
+type hostTuple struct {
+	host    string
+	allowed bool
+}
+
+func (router *Handler) matchHost(domain string, hosts []string) (string, bool) {
+	if !router.matchHostCache.Contains(domain) {
+		router.matchHostCache.Add(domain, hostTuple{host: "", allowed: false})
+		for _, host := range hosts {
+			if regexp.MustCompile(host).MatchString(domain) {
+				router.matchHostCache.Add(domain, hostTuple{host: host, allowed: true})
+			}
 		}
 	}
-	return false
+	v, _ := router.matchHostCache.Get(domain)
+	r, _ := v.(hostTuple)
+	return r.host, r.allowed
+}
+
+func (router *Handler) matchBasicAuthPath(domain string, path string, basicAuthConf map[string]map[string]string) bool {
+	key := domain + "\t" + path
+	if !router.matchBasicAuthPathCache.Contains(key) {
+		router.matchBasicAuthPathCache.Add(key, false)
+		for pathReStr := range basicAuthConf {
+			if regexp.MustCompile(pathReStr).MatchString(path) {
+				router.matchBasicAuthPathCache.Add(key, true)
+			}
+		}
+	}
+	v, _ := router.matchBasicAuthPathCache.Get(key)
+	r, _ := v.(bool)
+	return r
+}
+
+func (router *Handler) verifyBasicAuth(domain string, path string, authHeader string, basicRe *regexp.Regexp, basicUserRe *regexp.Regexp, basicAuthConf map[string]map[string]string) bool {
+	key := authHeader + "\t" + domain + "\t" + path
+	if !router.verifyBasicAuthCache.Contains(key) {
+		matches := basicRe.FindAllStringSubmatch(authHeader, -1)
+		router.verifyBasicAuthCache.Add(key, false)
+		if len(authHeader) > 0 && len(matches) > 0 {
+			encodedUser, err := base64.StdEncoding.DecodeString(matches[0][1])
+			if err == nil {
+				userMatches := basicUserRe.FindAllStringSubmatch(string(encodedUser), -1)
+				if len(userMatches[0]) == 3 {
+					for pathReStr, user := range basicAuthConf {
+						if regexp.MustCompile(pathReStr).MatchString(path) {
+							password, ok := user[userMatches[0][1]]
+							if ok {
+								if password == userMatches[0][2] {
+									router.verifyBasicAuthCache.Add(key, true)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	v, _ := router.verifyBasicAuthCache.Get(key)
+	r, _ := v.(bool)
+	return r
+}
+
+func (router *Handler) matchBearerAuthPath(domain string, path string, token string, allowedPaths []*regexp.Regexp) bool {
+	key := token + "\t" + domain + "\t" + path
+	if !router.matchBearerAuthPathCache.Contains(key) {
+		router.matchBearerAuthPathCache.Add(key, false)
+		for _, allowedPath := range allowedPaths {
+			if allowedPath.MatchString(path) {
+				router.matchBearerAuthPathCache.Add(key, true)
+			}
+		}
+	}
+	v, _ := router.matchBearerAuthPathCache.Get(key)
+	r, _ := v.(bool)
+	return r
+}
+
+func (router *Handler) matchNoAuthPath(domain string, path string, noAuthPaths []string) bool {
+	key := domain + "\t" + path
+	if !router.matchNoAuthPathCache.Contains(key) {
+		router.matchNoAuthPathCache.Add(key, false)
+		for _, noAuthPath := range noAuthPaths {
+			if regexp.MustCompile(noAuthPath).MatchString(path) {
+				router.matchNoAuthPathCache.Add(key, true)
+			}
+		}
+	}
+	v, _ := router.matchNoAuthPathCache.Get(key)
+	r, _ := v.(bool)
+	return r
+}
+
+func domainNotAllowed(context *gin.Context) {
+	context.JSON(http.StatusForbidden, gin.H{
+		"authorized": false,
+		"error":      "domain not allowd",
+	})
 }
 
 func authHeaderMissing(context *gin.Context) {
@@ -107,8 +271,13 @@ func pathNotAllowed(context *gin.Context) {
 	context.Writer.Header().Set("WWW-Authenticate", "Bearer realm=\"token_required\" error=\"not_allowed\"")
 	context.JSON(http.StatusForbidden, gin.H{
 		"authorized": false,
-		"error":      "not allowd",
+		"error":      "path not allowd",
 	})
+}
+
+func basicAuthRequired(context *gin.Context) {
+	context.Writer.Header().Set("WWW-Authenticate", "Basic realm=\"basic authentication required\"")
+	context.String(http.StatusUnauthorized, "")
 }
 
 func statusOK(context *gin.Context) {
