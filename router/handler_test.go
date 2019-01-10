@@ -153,6 +153,13 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 				})
 			}
 		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, "")
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
+		}
 	})
 
 	t.Run("with TOKEN1", func(t *testing.T) {
@@ -190,6 +197,13 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
+		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, "bearer TOKEN1")
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
 		}
 	})
 
@@ -229,6 +243,13 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 				})
 			}
 		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, "bearer TOKEN2")
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
+		}
 	})
 
 	t.Run("with TOKEN3", func(t *testing.T) {
@@ -266,6 +287,13 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
+		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, "bearer TOKEN3")
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
 		}
 	})
 
@@ -305,6 +333,13 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 				})
 			}
 		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, "bearer TOKEN4")
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
+		}
 	})
 
 	t.Run(`without "bearer" keyword`, func(t *testing.T) {
@@ -342,6 +377,13 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
+		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, "TOKEN1")
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
 		}
 	})
 
@@ -381,6 +423,13 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 				})
 			}
 		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, getBasicAuthHeader("user1", "password1"))
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
+		}
 	})
 
 	t.Run(`with valid "user2"`, func(t *testing.T) {
@@ -418,6 +467,13 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
+		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, getBasicAuthHeader("user2", "password2"))
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
 		}
 	})
 
@@ -457,6 +513,13 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 				})
 			}
 		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, getBasicAuthHeader("user3", "password3"))
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
+		}
 	})
 
 	t.Run(`with invalid "user1" password`, func(t *testing.T) {
@@ -495,8 +558,14 @@ func TestNewHandlerWithValidTokens(t *testing.T) {
 				})
 			}
 		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, getBasicAuthHeader("user1", "invalid"))
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusOK, r.StatusCode, "always return 200 when method == OPTIONS")
+			})
+		}
 	})
-
 }
 
 func TestNewHandlerNoEnv(t *testing.T) {
@@ -539,6 +608,13 @@ func TestNewHandlerNoEnv(t *testing.T) {
 				})
 			}
 		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, "")
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusForbidden, r.StatusCode, "always return 403 when method == OPTIONS")
+			})
+		}
 	})
 
 	t.Run("with TOKEN1", func(t *testing.T) {
@@ -576,6 +652,13 @@ func TestNewHandlerNoEnv(t *testing.T) {
 				})
 			}
 		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, "bearer TOKEN1")
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusForbidden, r.StatusCode, "always return 403 when method == OPTIONS")
+			})
+		}
 	})
 
 	t.Run(`with valid "user1"`, func(t *testing.T) {
@@ -612,6 +695,13 @@ func TestNewHandlerNoEnv(t *testing.T) {
 					assert.Equal(c.statusCode, r.StatusCode, c.desc)
 				})
 			}
+		}
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("?method=OPTIONS&path=%v", c.path), func(t *testing.T) {
+				r, err := doRequest("OPTIONS", c.path, getBasicAuthHeader("user1", "password1"))
+				assert.Nil(err, fmt.Sprintf("OPTIONS has no error"))
+				assert.Equal(http.StatusForbidden, r.StatusCode, "always return 403 when method == OPTIONS")
+			})
 		}
 	})
 }

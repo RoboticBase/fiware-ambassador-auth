@@ -111,10 +111,13 @@ func NewHandler() *Handler {
 	engine.NoRoute(func(context *gin.Context) {
 		domain := context.Request.Host
 		path := context.Request.URL.Path
+		method := context.Request.Method
 		authHeader := context.Request.Header.Get(authHeader)
 
 		if host, allowed := router.matchHost(domain, holder.GetHosts()); allowed {
-			if router.matchNoAuthPath(domain, path, holder.GetNoAuthPaths(host)) {
+			if method == "OPTIONS" {
+				statusOK(context)
+			} else if router.matchNoAuthPath(domain, path, holder.GetNoAuthPaths(host)) {
 				statusOK(context)
 			} else if router.matchBasicAuthPath(domain, path, holder.GetBasicAuthConf(host)) {
 				if router.verifyBasicAuth(domain, path, authHeader, basicRe, basicUserRe, holder.GetBasicAuthConf(host)) {
