@@ -14,12 +14,12 @@ COPY . /tmp/fiware-ambassador-auth
 
 RUN apk update && \
     apk add --no-cache --virtual .go musl-dev git go && \
-    mkdir -p $GOPATH/src/github.com/tech-sketch && \
-    mv /tmp/fiware-ambassador-auth $GOPATH/src/github.com/tech-sketch && \
-    cd $GOPATH/src/github.com/tech-sketch/fiware-ambassador-auth && \
+    mkdir -p $GOPATH/src/github.com/RoboticBase && \
+    mv /tmp/fiware-ambassador-auth $GOPATH/src/github.com/RoboticBase && \
+    cd $GOPATH/src/github.com/RoboticBase/fiware-ambassador-auth && \
     go get -u github.com/golang/dep/cmd/dep && \
     $GOPATH/bin/dep ensure && \
-    go install github.com/tech-sketch/fiware-ambassador-auth && \
+    go install github.com/RoboticBase/fiware-ambassador-auth && \
     mv $GOPATH/bin/fiware-ambassador-auth /usr/local/bin && \
     rm -rf $GOPATH && \
     apk del --purge .go
