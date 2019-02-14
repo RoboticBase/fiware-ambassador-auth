@@ -1,7 +1,7 @@
 # fiware-ambassador-auth
 This REST API service works with Ambassador on Kubernetes in order to authorize and authanticate the client.
 
-[![TravisCI Status](https://travis-ci.org/tech-sketch/fiware-ambassador-auth.svg?branch=master)](https://travis-ci.org/tech-sketch/fiware-ambassador-auth)
+[![TravisCI Status](https://travis-ci.org/RoboticBase/fiware-ambassador-auth.svg?branch=master)](https://travis-ci.org/RoboticBase/fiware-ambassador-auth)
 [![DockerHub Status](https://dockerbuildbadges.quelltext.eu/status.svg?organization=techsketch&repository=fiware-ambassador-auth)](https://hub.docker.com/r/techsketch/fiware-ambassador-auth/builds/)
 
 ## Description

@@ -16,7 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/tech-sketch/fiware-ambassador-auth/token"
+	"github.com/RoboticBase/fiware-ambassador-auth/token"
 
 	lru "github.com/hashicorp/golang-lru"
 )

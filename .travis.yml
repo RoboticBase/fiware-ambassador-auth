@@ -4,7 +4,7 @@ go:
   - "1.9.x"
   - "1.10.x"
   - "1.11.x"
-go_import_path: github.com/tech-sketch/fiware-ambassador-auth
+go_import_path: github.com/RoboticBase/fiware-ambassador-auth
 before_install:
   - go get github.com/golang/dep/...
 install:
