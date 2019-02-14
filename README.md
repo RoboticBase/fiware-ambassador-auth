@@ -2,7 +2,7 @@
 This REST API service works with Ambassador on Kubernetes in order to authorize and authanticate the client.
 
 [![TravisCI Status](https://travis-ci.org/RoboticBase/fiware-ambassador-auth.svg?branch=master)](https://travis-ci.org/RoboticBase/fiware-ambassador-auth)
-[![DockerHub Status](https://dockerbuildbadges.quelltext.eu/status.svg?organization=techsketch&repository=fiware-ambassador-auth)](https://hub.docker.com/r/techsketch/fiware-ambassador-auth/builds/)
+[![DockerHub Status](https://dockerbuildbadges.quelltext.eu/status.svg?organization=roboticbase&repository=fiware-ambassador-auth)](https://hub.docker.com/r/roboticbase/fiware-ambassador-auth/builds/)
 
 ## Description
 This REST API service accepts any path and any methods, and checks the Authorization Header of HTTP Request. In this version, Bearer Token Authorization and Basic Authorization are acceptable.
@@ -105,16 +105,16 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 
 ## Run as Docker container
 
-1. Pull container [techsketch/fiware-ambassador-auth](https://hub.docker.com/r/techsketch/fiware-ambassador-auth/) from DockerHub.
+1. Pull container [roboticbase/fiware-ambassador-auth](https://hub.docker.com/r/roboticbase/fiware-ambassador-auth/) from DockerHub.
 
     ```bash
-    $ docker pull techsketch/fiware-ambassador-auth
+    $ docker pull roboticbase/fiware-ambassador-auth
     ```
 1. Run Container.
     * If you want to change exposed port, set the `LISTEN_PORT` environment variable.
 
     ```bash
-    $ docker run -d -e AUTH_TOKENS="$(cat auth-tokens.json)" -e LISTEN_PORT=3000 -p 3000:3000 techsketch/fiware-ambassador-auth
+    $ docker run -d -e AUTH_TOKENS="$(cat auth-tokens.json)" -e LISTEN_PORT=3000 -p 3000:3000 roboticbase/fiware-ambassador-auth
     ```
 
 ## Build from source code
@@ -122,8 +122,8 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 1. go get
 
     ```bash
-    $ go get -u github.com/tech-sketch/fiware-ambassador-auth
-    $ cd ${GOPATH}/src/github.com/tech-sketch/fiware-ambassador-auth
+    $ go get -u github.com/RoboticBase/fiware-ambassador-auth
+    $ cd ${GOPATH}/src/github.com/RoboticBase/fiware-ambassador-auth
     ```
 1. install dependencies
 
@@ -134,7 +134,7 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 1. go install
 
     ```bash
-    $ go install github.com/tech-sketch/fiware-ambassador-auth
+    $ go install github.com/RoboticBase/fiware-ambassador-auth
     ```
 1. run service
 
