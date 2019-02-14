@@ -10,7 +10,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/tech-sketch/fiware-ambassador-auth/router"
+	"github.com/RoboticBase/fiware-ambassador-auth/router"
 )
 
 const listenPort = "LISTEN_PORT"
