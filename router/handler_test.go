@@ -17,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tech-sketch/fiware-ambassador-auth/token"
+	"github.com/RoboticBase/fiware-ambassador-auth/token"
 )
 
 var METHODS = [...]string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"}
