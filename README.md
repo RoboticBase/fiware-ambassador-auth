@@ -2,7 +2,7 @@
 This REST API service works with Ambassador on Kubernetes in order to authorize and authanticate the client.
 
 [![TravisCI Status](https://travis-ci.org/RoboticBase/fiware-ambassador-auth.svg?branch=master)](https://travis-ci.org/RoboticBase/fiware-ambassador-auth)
-[![DockerHub Status](https://dockerbuildbadges.quelltext.eu/status.svg?organization=roboticbase&repository=fiware-ambassador-auth)](https://hub.docker.com/r/roboticbase/fiware-ambassador-auth/builds/)
+[![Docker image size](https://img.shields.io/microbadger/image-size/roboticbase/fiware-ambassador-auth.svg)](https://hub.docker.com/r/roboticbase/fiware-ambassador-auth/)
 
 ## Description
 This REST API service accepts any path and any methods, and checks the Authorization Header of HTTP Request. In this version, Bearer Token Authorization and Basic Authorization are acceptable.
