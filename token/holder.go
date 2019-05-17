@@ -9,15 +9,22 @@ package token
 import (
 	"encoding/json"
 	"errors"
+	"github.com/fsnotify/fsnotify"
+	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
 )
 
 /*
-AuthTokens : AUTH_TOKEN is an environment vairable name to set token configurations.
+AuthTokens : AUTH_TOKENS is an environment vairable name to set token configurations.
 */
 const AuthTokens = "AUTH_TOKENS"
+
+/*
+AuthTokenPath : AUTH_TOKENS_PATH is an environment vairable name to set the file path of token configurations file.
+*/
+const AuthTokenPath = "AUTH_TOKENS_PATH"
 
 /*
 Holder : a struct to hold token configurations.
@@ -182,12 +189,45 @@ func (n *noAuths) UnmarshalJSON(b []byte) error {
 NewHolder : a factory method to create Holder.
 */
 func NewHolder() *Holder {
-	rawTokens := os.Getenv(AuthTokens)
-	if len(rawTokens) == 0 {
-		rawTokens = "[]"
+	var holder Holder
+	rawTokensPath := os.Getenv(AuthTokenPath)
+	if len(rawTokensPath) != 0 {
+		loadFile(&holder, rawTokensPath)
+		go monitor(&holder, rawTokensPath)
+	} else {
+		loadEnv(&holder)
 	}
-	log.Printf("%s: %v\n--------\n", AuthTokens, rawTokens)
+	return &holder
+}
 
+func loadFile(holder *Holder, rawTokensPath string) {
+	rawTokens := []byte("[]")
+	if len(rawTokensPath) != 0 {
+		f, err := os.Open(rawTokensPath)
+		defer f.Close()
+		if err == nil {
+			log.Printf("read tokens from \"%s\"\n", rawTokensPath)
+			rawTokens, err = ioutil.ReadAll(f)
+		} else {
+			log.Printf("can not open AUTH_TOKENS_PATH: %s\n", rawTokensPath)
+		}
+	} else {
+		log.Printf("empty AUTH_TOKENS_PATH\n")
+	}
+	log.Printf("rawTokens: \n%s\n--------\n", rawTokens)
+	makeHolder(holder, rawTokens)
+}
+
+func loadEnv(holder *Holder) {
+	rawTokensStr := os.Getenv(AuthTokens)
+	if len(rawTokensStr) == 0 {
+		rawTokensStr = "[]"
+	}
+	log.Printf("%s: %v\n--------\n", AuthTokens, rawTokensStr)
+	makeHolder(holder, []byte(rawTokensStr))
+}
+
+func makeHolder(holder *Holder, rawTokens []byte) {
 	var hostSettingsList []hostSettings
 
 	hosts := []string{}
@@ -196,7 +236,7 @@ func NewHolder() *Holder {
 	basicAuthPaths := map[string]map[string]map[string]string{}
 	noAuthPaths := map[string][]string{}
 
-	if err := json.Unmarshal([]byte(rawTokens), &hostSettingsList); err == nil {
+	if err := json.Unmarshal(rawTokens, &hostSettingsList); err == nil {
 		for _, hostSettings := range hostSettingsList {
 			hosts = append(hosts, hostSettings.Host)
 			for _, bearerToken := range hostSettings.AuthTokens.BearerTokens {
@@ -241,12 +281,26 @@ func NewHolder() *Holder {
 	log.Printf("basicAuthPaths, %v\n--------\n", basicAuthPaths)
 	log.Printf("noAuthPaths, %v\n--------\n", noAuthPaths)
 
-	return &Holder{
-		hosts:                   hosts,
-		bearerTokenAllowedPaths: bearerTokenAllowedPaths,
-		bearerTokens:            bearerTokens,
-		basicAuthPaths:          basicAuthPaths,
-		noAuthPaths:             noAuthPaths,
+	holder.hosts = hosts
+	holder.bearerTokenAllowedPaths = bearerTokenAllowedPaths
+	holder.bearerTokens = bearerTokens
+	holder.basicAuthPaths = basicAuthPaths
+	holder.noAuthPaths = noAuthPaths
+}
+
+func monitor(holder *Holder, rawTokensPath string) {
+	watcher, _ := fsnotify.NewWatcher()
+	defer watcher.Close()
+	for {
+		err := watcher.Add(rawTokensPath)
+		if err != nil {
+			log.Printf("watcher failed: %v\n", err)
+			return
+		}
+		select {
+		case <-watcher.Events:
+			loadFile(holder, rawTokensPath)
+		}
 	}
 }
 
