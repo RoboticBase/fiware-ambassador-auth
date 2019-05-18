@@ -22,9 +22,9 @@ AuthTokens : AUTH_TOKENS is an environment vairable name to set token configurat
 const AuthTokens = "AUTH_TOKENS"
 
 /*
-AuthTokenPath : AUTH_TOKENS_PATH is an environment vairable name to set the file path of token configurations file.
+AuthTokensPath : AUTH_TOKENS_PATH is an environment vairable name to set the file path of token configurations file.
 */
-const AuthTokenPath = "AUTH_TOKENS_PATH"
+const AuthTokensPath = "AUTH_TOKENS_PATH"
 
 /*
 Holder : a struct to hold token configurations.
@@ -190,7 +190,7 @@ NewHolder : a factory method to create Holder.
 */
 func NewHolder() *Holder {
 	var holder Holder
-	rawTokensPath := os.Getenv(AuthTokenPath)
+	rawTokensPath := os.Getenv(AuthTokensPath)
 	if len(rawTokensPath) != 0 {
 		loadFile(&holder, rawTokensPath)
 		go monitor(&holder, rawTokensPath)
