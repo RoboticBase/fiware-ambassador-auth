@@ -20,8 +20,8 @@ The authrization and authentication flow is like below:
 
 This REST API service is assumed to work with [Ambassador](https://www.getambassador.io/) on [Kubernetes](https://www.getambassador.io/).
 
-## `AUTH_TOKENS` JSON template
-
+## JSON template
+* set your tokens as the json like below.
 * `host` and `allowed_paths` can accept "rgular expression".
 
 ```text
@@ -103,6 +103,17 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 > ]
 > ```
 
+## An envrionment variable vs. a JSON file
+* You can set your tokens as an environment variable (`AUTH_TOKENS`) or json file path (`AUTH_TOKENS_PATH`).
+
+### set tokens as an environment variable
+* When you use the environment variable, you have to set your json string as `AUTH_TOKENS`.
+* After this program starts, your changes **will not be applied** even if you change your environment variable.
+
+### set tokens as a JSON file
+* When you use the JSON file, you have to set your json file path as `AUTH_TOKENS_PATH`.
+* When you change your json file, your change **will be applied** even if this program has already started.
+
 ## Run as Docker container
 
 1. Pull container [roboticbase/fiware-ambassador-auth](https://hub.docker.com/r/roboticbase/fiware-ambassador-auth/) from DockerHub.
@@ -112,10 +123,16 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
     ```
 1. Run Container.
     * If you want to change exposed port, set the `LISTEN_PORT` environment variable.
+    * run container using an environment variable.
 
-    ```bash
-    $ docker run -d -e AUTH_TOKENS="$(cat auth-tokens.json)" -e LISTEN_PORT=3000 -p 3000:3000 roboticbase/fiware-ambassador-auth
-    ```
+        ```bash
+        $ docker run -d -e AUTH_TOKENS="$(cat auth-tokens.json)" -e LISTEN_PORT=3000 -p 3000:3000 roboticbase/fiware-ambassador-auth:0.3.0
+        ```
+    * run container using a json file.
+
+        ```bash
+        $ docker run -d -e AUTH_TOKENS_PATH="$(pwd)/auth-tokens.json" -e LISTEN_PORT=3000 -p 3000:3000 roboticbase/fiware-ambassador-auth:0.3.0
+        ```
 
 ## Build from source code
 
@@ -147,4 +164,4 @@ This REST API service is assumed to work with [Ambassador](https://www.getambass
 [Apache License 2.0](/LICENSE)
 
 ## Copyright
-Copyright (c) 2018 TIS Inc.
+Copyright (c) 2018-2019 TIS Inc.
